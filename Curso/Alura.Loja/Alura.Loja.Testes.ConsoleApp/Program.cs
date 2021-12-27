@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,19 +11,46 @@ namespace Alura.Loja.Testes.ConsoleApp
     {
         static void Main(string[] args)
         {
-            GravarUsandoAdoNet();
+           using(var contexto = new LojaContext())
+            {
+                var produtos = contexto.Produtos.ToList();
+                foreach (var p in produtos)
+                {
+                    Console.WriteLine(p);
+                }
+
+                ExibeEntries(contexto.ChangeTracker.Entries());
+
+                var novoProduto = new Produto()
+                {
+                    Nome = "Sabão em pó",
+                    Categoria = "limpeza",
+                    Preco = 4.99
+                };
+                contexto.Produtos.Add(novoProduto);
+
+                ExibeEntries(contexto.ChangeTracker.Entries());
+
+                contexto.Produtos.Remove(novoProduto);
+
+                ExibeEntries(contexto.ChangeTracker.Entries());
+
+                //contexto.SaveChanges();
+                var entry = contexto.Entry(novoProduto);
+                Console.WriteLine("\n\n" + entry.Entity.ToString() + " - " + entry.State);
+
+                //ExibeEntries(contexto.ChangeTracker.Entries());
+            }
+
         }
 
-        private static void GravarUsandoAdoNet()
+        private static void ExibeEntries(IEnumerable<EntityEntry> entries)
         {
-            Produto p = new Produto();
-            p.Nome = "Harry Potter e a Ordem da Fênix";
-            p.Categoria = "Livros";
-            p.Preco = 19.89;
+            Console.WriteLine("=====================");
 
-            using (var repo = new ProdutoDAO())
+            foreach (var e in entries)
             {
-                repo.Adicionar(p);
+                Console.WriteLine(e.Entity.ToString() + " - " + e.State);
             }
         }
     }
