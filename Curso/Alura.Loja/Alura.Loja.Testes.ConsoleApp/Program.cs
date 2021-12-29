@@ -1,4 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore.ChangeTracking;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,47 +15,121 @@ namespace Alura.Loja.Testes.ConsoleApp
     {
         static void Main(string[] args)
         {
-           using(var contexto = new LojaContext())
+            using(var contexto = new LojaContext())
             {
-                var produtos = contexto.Produtos.ToList();
-                foreach (var p in produtos)
+                var cliente = contexto
+                            .Clientes
+                            .Include(c => c.EnderecoDeEntrega)
+                            .FirstOrDefault();
+                Console.WriteLine($"Endereco de entrega: {cliente.EnderecoDeEntrega.Logradouro}");
+
+                var produto = contexto
+                                .Produtos
+                                .Where(p => p.Id == 2002)
+                                .FirstOrDefault();
+                contexto.Entry(produto)
+                        .Collection(p => p.Compras)
+                        .Query()
+                        .Where(c => c.Preco > 1)
+                        .Load();
+
+                Console.WriteLine($"Mostrando as compras do produto {produto.Nome}");
+                foreach(var item in produto.Compras)
                 {
-                    Console.WriteLine(p);
+                    Console.WriteLine("\t" + item);
+                }
+            }
+        }
+
+        private static void ExibeProdutosDaPromocao()
+        {
+            using (var contexto2 = new LojaContext())
+            {
+                var promocao = contexto2
+                           .Promocoes
+                           .Include(p => p.Produtos)
+                           .ThenInclude(pp => pp.Produto)
+                           .FirstOrDefault();
+
+                Console.WriteLine("\nMostrando os produtos da promoção...");
+                foreach (var item in promocao.Produtos)
+                {
+                    Console.WriteLine(item.Produto);
+                }
+            }
+        }
+
+        private static void IncluirPromocao()
+        {
+            using (var contexto = new LojaContext())
+            {
+                var promocao = new Promocao();
+                promocao.Descricao = "Queima Total Janeiro 2017";
+                promocao.DataInicio = new DateTime(2017, 1, 1);
+                promocao.DataTermino = new DateTime(2017, 1, 31);
+
+                var produtos = contexto.Produtos.Where(p => p.Categoria == "Bebidas").ToList();
+
+                foreach (var item in produtos)
+                {
+                    promocao.IncluiProduto(item);
                 }
 
-                ExibeEntries(contexto.ChangeTracker.Entries());
+                contexto.Promocoes.Add(promocao);
 
-                var novoProduto = new Produto()
-                {
-                    Nome = "Sabão em pó",
-                    Categoria = "limpeza",
-                    Preco = 4.99
-                };
-                contexto.Produtos.Add(novoProduto);
-
-                ExibeEntries(contexto.ChangeTracker.Entries());
-
-                contexto.Produtos.Remove(novoProduto);
-
-                ExibeEntries(contexto.ChangeTracker.Entries());
-
-                //contexto.SaveChanges();
-                var entry = contexto.Entry(novoProduto);
-                Console.WriteLine("\n\n" + entry.Entity.ToString() + " - " + entry.State);
-
-                //ExibeEntries(contexto.ChangeTracker.Entries());
+                contexto.SaveChanges();
             }
-
         }
 
-        private static void ExibeEntries(IEnumerable<EntityEntry> entries)
+        private static void UmParaUm()
         {
-            Console.WriteLine("=====================");
-
-            foreach (var e in entries)
+            var fulano = new Cliente();
+            fulano.Nome = "Fulaninho de Tal";
+            fulano.EnderecoDeEntrega = new Endereco()
             {
-                Console.WriteLine(e.Entity.ToString() + " - " + e.State);
+                Numero = 12,
+                Logradouro = "Rua dos Inválidos",
+                Complemento = "sobrado",
+                Bairro = "Centro",
+                Cidade = "Cidade"
+            };
+
+            using (var contexto = new LojaContext())
+            {
+                contexto.Clientes.Add(fulano);
+                contexto.SaveChanges();
             }
         }
+
+        private static void MuitosParaMuitos() {
+
+            var p1 = new Produto() { Nome = "Suco de Laranja", Categoria = "Bebidas", PrecoUnitario = 8.79, Unidade = "Litros" };
+            var p2 = new Produto() { Nome = "Café", Categoria = "Bebidas", PrecoUnitario = 12.45, Unidade = "Gramas" };
+            var p3 = new Produto() { Nome = "Macarrão", Categoria = "Alimentos", PrecoUnitario = 4.23, Unidade = "Gramas" };
+
+            var promocaoDePascoa = new Promocao();
+            promocaoDePascoa.Descricao = "Páscoa Feliz";
+            promocaoDePascoa.DataInicio = DateTime.Now;
+            promocaoDePascoa.DataTermino = DateTime.Now.AddMonths(3);
+
+            promocaoDePascoa.IncluiProduto(p1);
+            promocaoDePascoa.IncluiProduto(p2);
+            promocaoDePascoa.IncluiProduto(p3);
+
+            using (var contexto = new LojaContext())
+            {
+                //var serviceProvider = contexto.GetInfrastructure<IServiceProvider>();
+                //var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+                //loggerFactory.AddProvider(SqlLoggerProvider.Create());
+
+                //contexto.Promocoes.Add(promocaoDePascoa);
+                var promocao = contexto.Promocoes.Find(1);
+                contexto.Promocoes.Remove(promocao);
+
+                contexto.SaveChanges();
+
+            }
+        }
+ 
     }
 }
